@@ -121,111 +121,6 @@ class InputFeatures(object):
         self.end_position = end_position
         self.is_impossible = is_impossible
 
-def read_newsqa_examples(input_file, is_training, version_2_with_negative):
-
-    #Uncomment to manually validate the generated vs guessed answers
-    #word_answers_file = open('./all_word_answers', 'w+')
-    #actual_answers_file = open('./all_actual_answers', 'w+')
-
-    """Read a SQuAD json file into a list of SquadExample."""
-    with open(input_file, "r", encoding='utf-8') as reader:
-        input_data = json.load(reader)["data"]
-
-    def is_whitespace(c):
-        if c == " " or c == "\t" or c == "\r" or c == "\n" or ord(c) == 0x202F:
-            return True
-        return False
-
-    examples = []
-    for entry in input_data:
-        for paragraph in entry["paragraphs"]:
-            # print (paragraph)
-            paragraph_text = paragraph["context"]
-            paragraph_text= paragraph_text.replace("\n", "  ")
-            doc_tokens = []
-            char_to_word_offset = []
-            prev_is_whitespace = True
-            for c in paragraph_text:
-                if is_whitespace(c):
-                    prev_is_whitespace = True
-                else:
-                    if prev_is_whitespace:
-                        doc_tokens.append(c)
-                    else:
-                        doc_tokens[-1] += c
-                    prev_is_whitespace = False
-                char_to_word_offset.append(len(doc_tokens) - 1)
-
-            for qa in paragraph["qas"]:
-                qas_id = qa["id"]
-                question_text = qa["question"]
-                start_position = None
-                end_position = None
-                orig_answer_text = None
-                is_impossible = False
-                if is_training:
-                    if version_2_with_negative:
-                        is_impossible = qa["is_impossible"]
-                    if (len(qa["answers"]) != 1) and (not is_impossible):
-                        raise ValueError(
-                            "For training, each question should have exactly 1 answer.")
-                    if not is_impossible:
-                        answer = qa["answers"][0]
-                        orig_answer_text = answer["text"]
-                        answer_offset = answer["answer_start"]
-                        answer_length = len(orig_answer_text)
-                        start_position = char_to_word_offset[answer_offset]
-                        end_position = char_to_word_offset[answer_offset + answer_length - 1]
-
-                        actual_text = " ".join(doc_tokens[start_position:(end_position + 1)])
-                        cleaned_answer_text = orig_answer_text # " ".join(whitespace_tokenize(orig_answer_text))
-
-                        #To manually validate the generated vs guessed answers
-                        #word_answers_file.write(actual_text+"\n")
-                        #actual_answers_file.write(cleaned_answer_text+"\n")
-
-                        # Following is not valid for NewsQA, since:
-                        # - indexing is a bit off for most questions,
-                        # actual_text.find(cleaned_answer_text) == -1 will thus fail in most even
-                        # with no "weird Unicode stuff"
-                        # - the encoding is pretty much handled properly in the tokens already
-                        # --- Only applicable for SQuAD ----
-                        # Only add answers where the text can be exactly recovered from the
-                        # document. If this CAN'T happen it's likely due to weird Unicode
-                        # stuff so we will just skip the example.
-                        #
-                        # Note that this means for training mode, every example is NOT
-                        # guaranteed to be preserved.
-                        #if actual_text.find(cleaned_answer_text) == -1:
-                        #    print("WARNING: Indexing seems a bit off for question:", question_text)
-                        #    print("Our guess : ", actual_text," vs. actual answer ", cleaned_answer_text)
-                        #    continue
-                        # --------------END-------------------
-                    else:
-                        start_position = -1
-                        end_position = -1
-                        actual_text = ""
-                        orig_answer_text = ""
-
-                # we use actual_text instead of orig_answer_text for NewsQA, since the
-                # indexing of character is not perfect.
-                # actual_text gives tokens while retaning the word indexing
-                # verified through manual comparison of the answers generated
-                example = SquadExample(
-                    qas_id=qas_id,
-                    question_text=question_text,
-                    doc_tokens=doc_tokens,
-                    orig_answer_text=actual_text,#orig_answer_text,
-                    start_position=start_position,
-                    end_position=end_position,
-                    is_impossible=is_impossible)
-                examples.append(example)
-    print ("OK", len(examples))
-
-    # Uncomment to manually validate the generated vs guessed answers
-    #actual_answers_file.close()
-    #word_answers_file.close()
-    return examples
 
 def read_squad_examples(input_file, is_training, version_2_with_negative):
     """Read a SQuAD json file into a list of SquadExample."""
@@ -942,9 +837,6 @@ def main():
     parser.add_argument('--null_score_diff_threshold',
                         type=float, default=0.0,
                         help="If null_score - best_non_null is greater than the threshold predict null.")
-
-    parser.add_argument('--is_newsqa', action='store_true', help="Whether to use NewsQA dataset.")
-
     args = parser.parse_args()
 
     if args.local_rank == -1 or args.no_cuda:
@@ -993,13 +885,8 @@ def main():
     train_examples = None
     num_train_optimization_steps = None
     if args.do_train:
-        if args.is_newsqa:
-            train_examples = read_newsqa_examples(
-                input_file=args.train_file, is_training=True, version_2_with_negative=args.version_2_with_negative)
-        else:
-            train_examples = read_squad_examples(
-                input_file=args.train_file, is_training=True, version_2_with_negative=args.version_2_with_negative)
-
+        train_examples = read_squad_examples(
+            input_file=args.train_file, is_training=True, version_2_with_negative=args.version_2_with_negative)
         num_train_optimization_steps = int(
             len(train_examples) / args.train_batch_size / args.gradient_accumulation_steps) * args.num_train_epochs
         if args.local_rank != -1:
@@ -1140,13 +1027,8 @@ def main():
     model.to(device)
 
     if args.do_predict and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
-        if args.is_newsqa:
-            eval_examples = read_newsqa_examples(
-                input_file=args.predict_file, is_training=False, version_2_with_negative=args.version_2_with_negative)
-        else:
-            eval_examples = read_squad_examples(
-                input_file=args.predict_file, is_training=False, version_2_with_negative=args.version_2_with_negative)            
-
+        eval_examples = read_squad_examples(
+            input_file=args.predict_file, is_training=False, version_2_with_negative=args.version_2_with_negative)
         eval_features = convert_examples_to_features(
             examples=eval_examples,
             tokenizer=tokenizer,
