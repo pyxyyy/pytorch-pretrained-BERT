@@ -163,6 +163,7 @@ def read_newsqa_examples(input_file, is_training, version_2_with_negative):
                 end_position = None
                 orig_answer_text = None
                 is_impossible = False
+                actual_text = None
                 if is_training:
                     if version_2_with_negative:
                         is_impossible = qa["is_impossible"]
@@ -1140,6 +1141,18 @@ def main():
     model.to(device)
 
     if args.do_predict and (args.local_rank == -1 or torch.distributed.get_rank() == 0):
+
+        # ADDED by Fiona: to load a trained model and config that have been fine-tuned
+        output_config_file = os.path.join(args.output_dir, CONFIG_NAME)
+        print ("output_config_file", output_config_file)
+        output_model_file = os.path.join(args.output_dir, WEIGHTS_NAME)
+        print ("output_model_file", output_model_file)
+        config = BertConfig(output_config_file)
+        print ("config", config)
+        model = BertForQuestionAnswering(config)
+        model.load_state_dict(torch.load(output_model_file))
+        model.to(device)
+
         if args.is_newsqa:
             eval_examples = read_newsqa_examples(
                 input_file=args.predict_file, is_training=False, version_2_with_negative=args.version_2_with_negative)

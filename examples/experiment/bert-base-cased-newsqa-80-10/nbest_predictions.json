@@ -1,0 +1,30 @@
+{
+    "./cnn/stories/f24611c99357abc87e37a6ce296b8e8f8e20b48e.story": [
+        {
+            "text": "empty",
+            "probability": 1.0,
+            "start_logit": 0.0,
+            "end_logit": 0.0
+        },
+        {
+            "text": "",
+            "probability": 0.0,
+            "start_logit": -4009.528564453125,
+            "end_logit": -4100.91552734375
+        }
+    ],
+    "./cnn/stories/caf0a11a0f67f35d606b0ffdba511f2d413791d7.story": [
+        {
+            "text": "empty",
+            "probability": 1.0,
+            "start_logit": 0.0,
+            "end_logit": 0.0
+        },
+        {
+            "text": "",
+            "probability": 0.0,
+            "start_logit": -4009.528564453125,
+            "end_logit": -4100.91552734375
+        }
+    ]
+}
