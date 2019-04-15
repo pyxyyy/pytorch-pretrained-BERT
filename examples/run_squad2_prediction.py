@@ -214,7 +214,7 @@ def read_newsqa_examples(input_file, is_training, version_2_with_negative):
 					end_position=end_position,
 					is_impossible=is_impossible)
 				examples.append(example)
-	print ("OK", len(examples))
+	print("OK", len(examples))
 
 	# Uncomment to manually validate the generated vs guessed answers
 	#actual_answers_file.close()
